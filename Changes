@@ -1,5 +1,12 @@
 Revision history for module SQLite:DB.
 
+0.04 Tue Nov 23 10:52:00 2004
+     - commit and rollback was returning '1' even with errors occuring.
+     - created @transaction_errors var to hold all errors of an transcation
+       since each exec creates it's own error, and at the end, if the commit
+       command itself does not had an error, it would consider all transaction
+       sucessfull, wich is wrong.
+
 0.03 Mon Aug 02 21:44:00 2004
      - select_one_row now returns undef if an error occur.
 

@@ -4,22 +4,16 @@ package SQLite::DB;
 
 # {{{ BEGIN
 #
-BEGIN
-{
+BEGIN {
   require Exporter;
 }
 # }}}
 # {{{ use block
-
+#
 use strict;
 use Exporter;
 use DBI;
 use DBD::SQLite;
-
-use constant {
-  FALSE  => 0,      # Booleans
-  TRUE   => 1,
-};
 
 use constant { INVALID => 0,     # SQL Statment types
                SELECT  => 1,
@@ -27,12 +21,9 @@ use constant { INVALID => 0,     # SQL Statment types
 	       UPDATE  => 3,
 	       DELETE  => 4,
 	       CREATE  => 5,
-	       DROP    => 6,
-	     };
+	       DROP    => 6,};
 
 use base 'Exporter';
-
-our @Export = qw(FALSE TRUE);
 
 # }}}
 # {{{ variable declarations
@@ -41,10 +32,11 @@ our @ISA = ('Exporter');
 our @EXPORT = qw(connect disconnect transaction_mode commit exec
              select get_dboptionlist get_dblist get_error);
 
-our $VERSION    = '0.03';
+our $VERSION    = '0.04';
 
-my $last_rowid    = undef;
-my $affected_rows = 0;
+my $last_rowid         = undef;
+my $affected_rows      = 0;
+my @transaction_errors;
 
 # }}}
 
@@ -72,10 +64,11 @@ sub connect {
   my $db   = DBI->connect("dbi:SQLite:dbname=".$this->{dbfile},"","");
 
   $db->{PrintError} = 0;
+  $db->{RaiseError} = 0;
 
   return 0 if ($this->check_error(__PACKAGE__."::connect - Error while connecting to DBI :"));
 
-  if (! defined $db) {
+  if (!defined $db) {
     $this->{dberror} = "Cannot connect to databases: $DBI::errstr\n";
     return 0;
   }
@@ -90,7 +83,7 @@ sub connect {
 sub disconnect {
   my $this = shift;
 
-  $this->{dbconn}->disconnect;
+  $this->{dbconn}->disconnect || return 0;
   $this->{dbconn} = undef;
 
   return 1;
@@ -101,8 +94,9 @@ sub disconnect {
 sub transaction_mode {
   my $this = shift;
 
+  @transaction_errors = ();
   $this->{dbconn}->{AutoCommit} = 0;
-  $this->{dbconn}->{RaiseError} = 1;
+
 }
 # }}}
 # {{{ commit                            Commit transaction
@@ -110,22 +104,23 @@ sub transaction_mode {
 sub commit {
   my $this   = shift;
   my $result = 1;
-
+  my $error;
   return 1 if ($this->{dbconn}->{AutoCommit});
 
-  $this->{dbconn}->commit;
+  eval { $this->{dbconn}->commit } if !(@transaction_errors>0);
 
-  if ($@) {                             # Check if errors occurred in the transaction
-    $result          = 1;
-    $this->{dberror} = "DBSqlite::DB::commit - Error in transaction because $@\n ";
-    $this->{dbconn}->rollback;
+  if ($@ || @transaction_errors>0) { # Check if errors occurred in the transaction
+    $result          = 0;
+    $error           = ($@) ? $@ : join "\n",@transaction_errors;
+    $this->{dberror} = "DBSqlite::DB::commit - Error in transaction because $error";
+    eval {$this->{dbconn}->rollback};
   }
 
   $this->{dbconn}->{AutoCommit} = 1;
-  $this->{dbconn}->{RaiseError} = 0;
 
   return $result;
 }
+
 # }}}
 # {{{ rollback                          Rollback transaction
 #
@@ -138,15 +133,15 @@ sub rollback {
   $this->{dbconn}->rollback;
 
   if ($@) {                             # Check if errors occurred in the transaction
-    $result          = 1;
+    $result          = 0;
     $this->{dberror} = "DBSqlite::DB::rollback - Error in transaction because $@\n ";
   }
 
   $this->{dbconn}->{AutoCommit} = 1;
-  $this->{dbconn}->{RaiseError} = 0;
 
   return $result;
 }
+
 # }}}
 # {{{ exec                              Execute an query
 #
@@ -174,7 +169,7 @@ sub exec {
   $rv = $sth->execute(@bind);
   return 0 if ($this->check_error(__PACKAGE__."::exec_query - Error while executing :"));
 
-  $last_rowid    = $this->{dbconn}->func('last_insert_rowid') if ($type == INSERT);
+  $last_rowid = $this->{dbconn}->func('last_insert_rowid') if ($type == INSERT);
 
   if (($type == DELETE || $type == UPDATE) && $rv != 0E0) {
     $affected_rows = $rv;
@@ -298,6 +293,7 @@ sub check_error {
     $this->{dberror}  = $err_id."\n";
     $this->{dberror} .= "SQL : ".$query."\n" if (defined $query);
     $this->{dberror} .= "Errors: $DBI::err, $DBI::errstr\n";
+    push @transaction_errors,$this->{dberror};
     return 1;
   }
 
