@@ -41,7 +41,7 @@ our @ISA = ('Exporter');
 our @EXPORT = qw(connect disconnect transaction_mode commit exec
              select get_dboptionlist get_dblist get_error);
 
-our $VERSION    = '0.01';
+our $VERSION    = '0.02';
 
 my $last_rowid    = undef;
 my $affected_rows = 0;
@@ -111,6 +111,8 @@ sub commit {
   my $this   = shift;
   my $result = 1;
 
+  return 1 if ($this->{dbconn}->{AutoCommit});
+
   $this->{dbconn}->commit;
 
   if ($@) {                             # Check if errors occurred in the transaction
@@ -130,6 +132,8 @@ sub commit {
 sub rollback {
   my $this   = shift;
   my $result = 1;
+
+  return 1 if ($this->{dbconn}->{AutoCommit});
 
   $this->{dbconn}->rollback;
 
@@ -336,11 +340,9 @@ DBI and DBD::SQLite modules.
 
  $db->connect;
 
- $db->select("select * from table where field = value") || print $db->get_error."\n";
+ $db->select("select * from table where field = value",{}) || print $db->get_error."\n";
 
- $db->select("select * from table where field = ?","value") || print $db->get_error."\n";
-
- $db->select("select * from table where field = ?","value") || print $db->get_error."\n";
+ $db->select("select * from table where field = ?",{},"value") || print $db->get_error."\n";
 
  $result = $db->select_one_row("select max(field) as total FROM table");
 
@@ -371,17 +373,87 @@ DBI and DBD::SQLite modules.
 
 The goal is provide simple coding style to interact with SQLite databases.
 
-=head2 Functions
+=head1  CLASSES
 
-=item * new(path to db file)
+SQLite::DB
 
-Constructor.
+=head1 USE
+
+DBI, DBD:SQLite
+
+=head1 CLASS METHODS
+
+=head2 new($path)
+
+Construtor. $path is the full path to the db file.
+
+=head2 connect
+
+Connect to the database. If it does not exists, it created an new database.
+
+=head2 disconnect
+
+Disconnect to the database.
+
+=head2 transaction_mode
+
+Define transaction mode. No commits will be done until get the commit function.
+
+=head2 commit
+
+Commit an transaction. If is not in transaction mode, nothing happens.
+
+=head2 rollback
+
+Rollback an transaction. If is not in transaction mode, nothing happens.
+
+=head2 exec($query,[@args...])
+
+Execute an query. Optional argumens are used when you want to bind params of your query.
+
+=head2 select($query,$funcptr,[@args...])
+
+Execute an select query.
+
+$funcptr is an callback function pointer that received $sth object as argument, to process the rows of the select query.
+
+Optional argumens are used when you want to bind params of your query.
+
+=head2 select_one_row($query)
+
+Provides an easier way to retrieve one row queries. It returns an hash with field/values of the query.
+
+=head2 get_dblist($query,$display_field,$keyfield)
+
+Provided an easier way to retrive two columns queries.
+
+It returns an array with hash itens with "id" and "value" itens.
+
+=head2 get_error
+
+Return last error.
+
+$head2 get_affected_rows
+
+Return the number of affected rows from the last exec query.
 
 =back
 
-=head1 EXPORT_OK
+=head1 INTERNAL METHODS
 
-w2n
+=item * check_error
+
+This method provide an common way to check DBI/DBD errors.
+
+=item * get_sql_type
+
+This returns the type of an query.
+
+=head1 EXPORT
+
+$item * last_insert_rowid
+
+Stores the last insert rowid.
 
 =head1 KNOWN BUGS
 

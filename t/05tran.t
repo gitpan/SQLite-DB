@@ -1,6 +1,6 @@
 use strict;
 use Test;
-BEGIN { plan tests => 22 }
+BEGIN { plan tests => 24 }
 use SQLite::DB;
 my $db = SQLite::DB->new("foo");
 my $sql;
@@ -11,6 +11,9 @@ ok($db->connect);
 
 ok($db->exec("CREATE TABLE MST (id, lbl)"));
 ok($db->exec("CREATE TABLE TRN (no, id, qty)"));
+
+ok($db->commit);
+ok($db->rollback);
 
 $db->transaction_mode;
 ok($db->exec("INSERT INTO MST VALUES(1, 'ITEM1')"));
