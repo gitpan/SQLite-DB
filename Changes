@@ -1,5 +1,8 @@
 Revision history for module SQLite:DB.
 
+0.03 Mon Aug 02 21:44:00 2004
+     - select_one_row now returns undef if an error occur.
+
 0.02 Thu Jun 03 20:06:00 2004
      - Improved POD documentation.
      = Commit and Rollback now checks if is under transaction.

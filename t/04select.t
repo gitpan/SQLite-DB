@@ -1,12 +1,17 @@
 use strict;
 use Test;
-BEGIN { plan tests => 8 }
+BEGIN { plan tests => 10 }
 use SQLite::DB;
 my $db = SQLite::DB->new("foo");
+my $result;
 ok($db);
 ok($db->connect);
 ok($db->select("SELECT * FROM F",\&select_callback1));
 ok($db->select("SELECT f.f1 FROM f WHERE f.f1 LIKE ?",\&select_callback2,'%Luck%'));
+
+ok($result = $db->select_one_row("SELECT f.* FROM f WHERE f.f2 = ?",'Skywalker'));
+ok($$result{f1} eq "Luck");
+
 ok($db->disconnect);
 
 sub select_callback1 {

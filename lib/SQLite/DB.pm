@@ -41,7 +41,7 @@ our @ISA = ('Exporter');
 our @EXPORT = qw(connect disconnect transaction_mode commit exec
              select get_dboptionlist get_dblist get_error);
 
-our $VERSION    = '0.02';
+our $VERSION    = '0.03';
 
 my $last_rowid    = undef;
 my $affected_rows = 0;
@@ -232,7 +232,7 @@ sub select_one_row {
   my $this   = shift;
   my $query  = shift;
   my @bind   = @_;
-  my $result = {};
+  my $result = undef;
 
   $this->select($query,
 		sub { my $sth = (defined $_[0]) ? shift : return;
